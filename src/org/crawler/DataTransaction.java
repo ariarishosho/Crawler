@@ -90,6 +90,7 @@ public class DataTransaction {
 
 	/**
 	 * DBコネクションを取得する
+	 * 
 	 * @return
 	 */
 	public Connection getConnection() {

@@ -143,9 +143,10 @@ public class YahooPageParser {
 	 * 
 	 * @param regex_date
 	 * @return
-	 * @throws ParseException 
+	 * @throws ParseException
 	 */
-	private List<Date> convertDate(Map<String, List<String>> regex_date) throws ParseException {
+	private List<Date> convertDate(Map<String, List<String>> regex_date)
+			throws ParseException {
 		List<Date> dates;
 		String strPresumeDate;
 		int yyyy = 0;
@@ -263,7 +264,7 @@ public class YahooPageParser {
 						.hasNext();) {
 					String date = iterator.next();
 					SimpleDateFormat frmt = new SimpleDateFormat();
-					
+
 					if (e.getKey() == regex_yyyyMMdd) {
 						dates.add(frmt.parse(date));
 					} else if (e.getKey() == regex_wareki) {
