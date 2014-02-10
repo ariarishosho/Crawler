@@ -5,7 +5,6 @@ import java.io.IOException;
 import org.crawler.media.YahooPageParser;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
 
 public class WebPageAnalyzer {
 	public void getContetPage(String url) {
