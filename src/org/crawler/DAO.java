@@ -51,7 +51,7 @@ public class DAO {
 			try {
 				run.update(
 						conn,
-						"INSERT INTO CONTENT(presume_date,report_content,report_url,crawle_date) VALUES(?,?,?,?)",
+						"INSERT INTO CONTENTS(presume_date,report_content,report_url,crawle_date) VALUES(?,?,?,?)",
 						t.getPresume_date(), t.getReport_content(),
 						t.getReport_url(), t.getCrawle_date());
 			} catch (SQLException e) {

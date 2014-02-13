@@ -21,8 +21,8 @@ public class DataTransaction {
 	public static Connection connection = null;
 	// 環境変数
 	private final static String username = "root";
-	private final static String password = "#d33h114";
-	private final static String url = "jdbc:mysql://localhost:3306/crawlers";
+	private final static String password = "#d33h1144";
+	private final static String url = "jdbc:mysql://localhost:3306/crawler?useUnicode=true&characterEncoding=utf8";
 
 	public static int connectionCount = 0;
 

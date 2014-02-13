@@ -16,6 +16,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.crawler.DAO;
 import org.crawler.TableRecord;
 import org.crawler.util.EditUtil;
 import org.jsoup.Jsoup;
@@ -60,9 +61,15 @@ public class YahooPageParser {
 				// 記事本文を取得
 				content = contentsPage.getElementsByClass("ynDetailText")
 						.html();
+				if(content.length() == 0){
+					content = contentsPage.getElementsByClass("detailHeadline")
+							.html();
+				}
 				content = EditUtil.trimTags(content);
 				// 日付抽出
-				pickPresumeDate(content);
+				List<TableRecord> rows = pickPresumeDate(content);
+				DAO dao = new DAO();
+				dao.insert(rows);
 			}
 		} catch (IOException e) {
 			// TODO 自動生成された catch ブロック
@@ -90,19 +97,19 @@ public class YahooPageParser {
 	// 1月
 	String regex_MM = "(?<![-/¥.／−．年0-9０-９]{1})([0-9０-９]{1,2})[¥.．月]+(?![-/¥.／−．0-9０-９])";
 	// 来年１２月
-	String regex_soutaiyyMM = "(今年|来年|翌年|再来年|去年|昨年|一昨年)([0-9０-９]{1,2})[-/¥.／−．月]{1}";
+	String regex_soutaiyyMM = "(本年|今年|来年|翌年|再来年|去年|昨年|一昨年)([0-9０-９]{1,2})[-/¥.／−．月]{1}";
 	// 来月６日
 	String regex_soutaiMMdd = "(今月|来月|翌月|再来月|先月|先々月)([0-9０-９]{1,2})[-/¥.／−．日]{1}";
 	// 明日６日
-	String regex_soutaidd = "(今日|明日|翌日|明後日|昨日|一昨日)([0-9０-９]{1,2})[-/¥.／−．日]{1}";
+	String regex_soutaidd = "(本日|今日|明日|翌日|明後日|昨日|一昨日)([0-9０-９]{1,2})[-/¥.／−．日]{1}";
 	// 漢数字 二〇〇四年一二月一四日
 	String regex_kanjiyyyyMMdd = "[〇一二三四五六七八九十]{3,4}[-/¥.／−．年]{1}([〇一二三四五六七八九十]{1,2})[-/¥.／−．月]{1}([〇一二三四五六七八九十]{1,2})[¥.．日]?";
 	// 漢数字 二〇〇四年度一二月 or 二〇〇四年一二月
 	String regex_kanjiyyyyMM = "[〇一二三四五六七八九十]{3,4}[-/¥.／−．年]{1}度?([〇一二三四五六七八九十]{1,2})[-/¥.／−．月]{1}(?![〇一二三四五六七八九十])";
 
 	String[] targetPatterns = { regex_yyyyMMdd, regex_wareki, regex_yyMM,
-			regex_MMdd, regex_dd, regex_yyyy, regex_yy, regex_yy, regex_MM,
-			regex_MM, regex_soutaiyyMM, regex_soutaiMMdd, regex_soutaidd,
+			regex_MMdd, regex_dd, regex_yyyy, regex_yy, regex_MM,
+			regex_soutaiyyMM, regex_soutaiMMdd, regex_soutaidd,
 			regex_kanjiyyyyMMdd, regex_kanjiyyyyMM };
 
 	/**
@@ -114,7 +121,8 @@ public class YahooPageParser {
 	 */
 	private List<TableRecord> pickPresumeDate(String contents) {
 
-		List<Date> date; // 予想日付
+		List<Date> date = null; // 予想日付
+		List<TableRecord> record = new ArrayList<TableRecord>();
 		Map<String, List<String>> regex_date = new HashMap<String, List<String>>(); // 正規表現で抜き出された文字列
 		if (contents != null) {
 			// 正規表現抜き出し
@@ -134,8 +142,35 @@ public class YahooPageParser {
 					regex_date.put(targetPattern, arry);
 				}
 			}
+			try {
+				date = convertDate(regex_date);
+			} catch (ParseException e) {
+				// TODO 自動生成された catch ブロック
+				e.printStackTrace();
+			}
+			Date today = new Date();
+			if (date != null && date.size() > 0) {
+				
+				for (Date presume_date : date) {
+					TableRecord row = new TableRecord();
+					row.setCrawle_date(today);
+					row.setDate_exit(true);
+					row.setPresume_date(presume_date);
+					row.setReport_content(contents);
+					row.setReport_url("");
+					record.add(row);
+				}
+			} else {
+				TableRecord row = new TableRecord();
+				row.setCrawle_date(today);
+				row.setDate_exit(false);
+				row.setPresume_date(today);
+				row.setReport_content(contents);
+				row.setReport_url("");
+				record.add(row);
+			}
 		}
-		return null;
+		return record;
 	}
 
 	/**
@@ -147,7 +182,7 @@ public class YahooPageParser {
 	 */
 	private List<Date> convertDate(Map<String, List<String>> regex_date)
 			throws ParseException {
-		List<Date> dates;
+		List<Date> dates = null;
 		String strPresumeDate;
 		int yyyy = 0;
 		int MM = 0;
@@ -223,7 +258,6 @@ public class YahooPageParser {
 			}
 
 			if (regex_date.containsValue(regex_soutaiMMdd)) {
-
 				if (dd == 0) {
 					// 日がなかった場合
 					Pattern pat = Pattern.compile("[0-9０-９]");
@@ -268,26 +302,123 @@ public class YahooPageParser {
 					if (e.getKey() == regex_yyyyMMdd) {
 						dates.add(frmt.parse(date));
 					} else if (e.getKey() == regex_wareki) {
+						dates.add(frmt.parse(date));
 					} else if (e.getKey() == regex_yyMM) {
+						Date _yyMM = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_yyMM);
+						cal.set(Calendar.DAY_OF_MONTH, dd);
+						dates.add(cal.getTime());
 					} else if (e.getKey() == regex_MMdd) {
+						Date _MMdd = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_MMdd);
+						cal.set(Calendar.YEAR, yyyy);
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_dd) {
+						frmt.applyPattern("d");
+						Date _dd = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_dd);
+						cal.set(Calendar.YEAR, yyyy);
+						cal.set(Calendar.MONTH, MM);
+						dates.add(cal.getTime());
 					} else if (e.getKey() == regex_yyyy) {
+						Date _yyyy = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_yyyy);
+						cal.set(Calendar.MONTH, MM);
+						cal.set(Calendar.DAY_OF_MONTH, dd);
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_yy) {
-					} else if (e.getKey() == regex_yy) {
+						Date _yy = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_yy);
+						cal.set(Calendar.MONTH, MM);
+						cal.set(Calendar.DAY_OF_MONTH, dd);
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_MM) {
-					} else if (e.getKey() == regex_MM) {
+						Date _MM = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_MM);
+						cal.set(Calendar.YEAR, yyyy);
+						cal.set(Calendar.DAY_OF_MONTH, dd);
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_soutaiyyMM) {
+						Calendar cal = Calendar.getInstance();
+						cal.set(yyyy, MM, dd);
+						if (e.getKey().contains("本年")
+								|| e.getKey().contains("今年")) {
+							// そのまま
+						} else if (e.getKey().contains("来年")
+								|| e.getKey().contains("翌年")) {
+							cal.add(Calendar.YEAR, 1);
+						} else if (e.getKey().contains("再来年")) {
+							cal.add(Calendar.YEAR, 2);
+						} else if (e.getKey().contains("去年")
+								|| e.getKey().contains("昨年")) {
+							cal.add(Calendar.YEAR, -1);
+						} else if (e.getKey().contains("一昨年")
+								|| e.getKey().contains("今日")) {
+							cal.add(Calendar.YEAR, -2);
+						}
+
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_soutaiMMdd) {
+						Calendar cal = Calendar.getInstance();
+						cal.set(yyyy, MM, dd);
+						if (e.getKey().contains("今月")) {
+							// そのまま
+						} else if (e.getKey().contains("来月")
+								|| e.getKey().contains("翌月")) {
+							cal.add(Calendar.MONTH, 1);
+						} else if (e.getKey().contains("再来月")) {
+							cal.add(Calendar.MONTH, 2);
+						} else if (e.getKey().contains("先月")) {
+							cal.add(Calendar.MONTH, -1);
+						} else if (e.getKey().contains("先々月")) {
+							cal.add(Calendar.MONTH, -2);
+						}
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_soutaidd) {
+						Calendar cal = Calendar.getInstance();
+						cal.set(yyyy, MM, dd);
+						if (e.getKey().contains("本日")
+								|| e.getKey().contains("今日")) {
+							// そのまま
+						} else if (e.getKey().contains("明日")
+								|| e.getKey().contains("翌日")) {
+							cal.add(Calendar.DAY_OF_MONTH, 1);
+						} else if (e.getKey().contains("明後日")) {
+							cal.add(Calendar.DAY_OF_MONTH, 2);
+						} else if (e.getKey().contains("昨日")) {
+							cal.add(Calendar.DAY_OF_MONTH, -1);
+						} else if (e.getKey().contains("一昨日")) {
+							cal.add(Calendar.DAY_OF_MONTH, -2);
+						}
+						dates.add(cal.getTime());
+
 					} else if (e.getKey() == regex_kanjiyyyyMMdd) {
+						dates.add(frmt.parse(date));
 					} else if (e.getKey() == regex_kanjiyyyyMM) {
+						Date _kanjiyyyyMM = frmt.parse(date);
+						Calendar cal = Calendar.getInstance();
+						cal.setTime(_kanjiyyyyMM);
+						cal.set(Calendar.DAY_OF_MONTH, dd);
+						dates.add(cal.getTime());
 					}
 				}
 
 				System.out.println(e.getKey() + " : " + e.getValue());
 			}
 		}
-		return null;
+		return dates;
 	}
 
 	private Calendar getCalendar(String strPresumeDate) {
